@@ -40,7 +40,7 @@ custom_liquid_dataset = L(Dataset)(
     video_size=(704, 1280),
 )
 
-dataloader_train_cosmos_nemo_assets = L(DataLoader)(
+dataloader_train_custom_liquid_dataset = L(DataLoader)(
     dataset=custom_liquid_dataset,
     sampler=L(get_sampler)(dataset=custom_liquid_dataset),
     batch_size=1,
@@ -50,7 +50,7 @@ dataloader_train_cosmos_nemo_assets = L(DataLoader)(
 )
 
 # torchrun --nproc_per_node=8 --master_port=12341 -m scripts.train --config=cosmos_predict2/configs/base/config.py -- experiment=predict2_video2world_training_2b_cosmos_nemo_assets
-predict2_video2world_training_2b_custom_liquid = dict(
+predict2_video2world_training_2b_custom_liquid_1_6k = dict(
     defaults=[
         {"override /model": "predict2_video2world_fsdp_2b"},
         {"override /optimizer": "fusedadamw"},
@@ -83,7 +83,7 @@ predict2_video2world_training_2b_custom_liquid = dict(
     model_parallel=dict(
         context_parallel_size=2,
     ),
-    dataloader_train=dataloader_train_cosmos_nemo_assets,
+    dataloader_train=dataloader_train_custom_liquid_dataset,
     trainer=dict(
         distributed_parallelism="fsdp",
         callbacks=dict(
@@ -92,7 +92,7 @@ predict2_video2world_training_2b_custom_liquid = dict(
         max_iter=100000,
     ),
     checkpoint=dict(
-        save_iter=500,
+        save_iter=1000,
     ),
     optimizer=dict(
         lr=2 ** (-10),
@@ -101,13 +101,13 @@ predict2_video2world_training_2b_custom_liquid = dict(
         warm_up_steps=[1_000],
         cycle_lengths=[5_000],
         f_max=[0.6],
-        f_min=[0.3],
+        f_min=[0.0],
     ),
 )
 
 for _item in [
     # 2b, cosmos_nemo_assets
-    predict2_video2world_training_2b_custom_liquid,
+    predict2_video2world_training_2b_custom_liquid_1_6k,
 ]:
     # Get the experiment name from the global variable.
     experiment_name = [name.lower() for name, value in globals().items() if value is _item][0]
