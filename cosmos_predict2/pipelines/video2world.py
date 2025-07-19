@@ -185,7 +185,7 @@ def read_and_process_video(
 
     # Calculate how many frames to extract from input video
     frames_to_extract = 4 * (num_latent_conditional_frames - 1) + 1
-    log.info(f"Will extract the last {frames_to_extract} frames from input video and pad to {num_video_frames}")
+    log.info(f"Will extract the *first* {frames_to_extract} frames from input video and pad to {num_video_frames}")
 
     # Validate num_latent_conditional_frames
     if num_latent_conditional_frames not in [1, 2]:
@@ -198,7 +198,9 @@ def read_and_process_video(
 
     # Extract the last frames_to_extract from input video
     start_idx = available_frames - frames_to_extract
-    extracted_frames = video_tensor[:, start_idx:, :, :]  # (C, frames_to_extract, H, W)
+    
+    # Changed to condition the **first** frames_to_extract frames
+    extracted_frames = video_tensor[:, :frames_to_extract, :, :]  # (C, frames_to_extract, H, W)
 
     # Convert to (frames_to_extract, C, H, W) for resize
     extracted_frames = extracted_frames.permute(1, 0, 2, 3)  # (frames_to_extract, C, H, W)
