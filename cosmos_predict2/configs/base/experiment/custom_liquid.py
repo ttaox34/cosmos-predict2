@@ -50,7 +50,7 @@ dataloader_train_custom_liquid_dataset = L(DataLoader)(
 )
 
 # torchrun --nproc_per_node=8 --master_port=12341 -m scripts.train --config=cosmos_predict2/configs/base/config.py -- experiment=predict2_video2world_training_2b_cosmos_nemo_assets
-predict2_video2world_training_2b_custom_liquid_1_6k = dict(
+predict2_video2world_training_2b_custom_liquid = dict(
     defaults=[
         {"override /model": "predict2_video2world_fsdp_2b"},
         {"override /optimizer": "fusedadamw"},
@@ -62,7 +62,7 @@ predict2_video2world_training_2b_custom_liquid_1_6k = dict(
     job=dict(
         project="posttraining",
         group="video2world",
-        name="custom_liquid_1_6k",
+        name="custom_liquid_lr-9_2+98",
     ),
     model=dict(
         config=dict(
@@ -89,17 +89,17 @@ predict2_video2world_training_2b_custom_liquid_1_6k = dict(
         callbacks=dict(
             iter_speed=dict(hit_thres=10),
         ),
-        max_iter=100000,
+        max_iter=100_000,
     ),
     checkpoint=dict(
-        save_iter=1000,
+        save_iter=1_000,
     ),
     optimizer=dict(
-        lr=2 ** (-10),
+        lr=2 ** (-9),
     ),
     scheduler=dict(
-        warm_up_steps=[1_000],
-        cycle_lengths=[5_000],
+        warm_up_steps=[2_000],
+        cycle_lengths=[98_000],
         f_max=[0.6],
         f_min=[0.0],
     ),
@@ -107,7 +107,7 @@ predict2_video2world_training_2b_custom_liquid_1_6k = dict(
 
 for _item in [
     # 2b, cosmos_nemo_assets
-    predict2_video2world_training_2b_custom_liquid_1_6k,
+    predict2_video2world_training_2b_custom_liquid,
 ]:
     # Get the experiment name from the global variable.
     experiment_name = [name.lower() for name, value in globals().items() if value is _item][0]

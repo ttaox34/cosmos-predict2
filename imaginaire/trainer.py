@@ -16,6 +16,7 @@
 import functools
 import inspect
 import os
+import wandb
 import signal
 
 import torch
@@ -211,6 +212,8 @@ class ImaginaireTrainer:
                     self.callbacks.on_training_step_batch_end(
                         model, data_batch, output_batch, loss, iteration=iteration
                     )
+                    if distributed.is_rank0():
+                        wandb.log({"train/loss": loss}, step=iteration)
                     # If the gradients are still being accumulated, continue to load the next training batch.
                     if grad_accum_iter != 0:
                         continue
@@ -289,6 +292,8 @@ class ImaginaireTrainer:
                 grad_scaler.step(optimizer)
                 grad_scaler.update()
                 scheduler.step()
+                if distributed.is_rank0():
+                    wandb.log({"train/lr": optimizer.param_groups[0]["lr"]}, step=iteration)
                 self.callbacks.on_before_zero_grad(model_ddp, optimizer, scheduler, iteration=iteration)
                 if self.config.trainer.distributed_parallelism == "ddp":
                     model_ddp.module.on_before_zero_grad(optimizer, scheduler, iteration=iteration)
@@ -318,5 +323,7 @@ class ImaginaireTrainer:
                 data_batch = misc.to(data_batch, device="cuda")
                 self.callbacks.on_validation_step_start(model, data_batch, iteration=iteration)
                 output_batch, loss = model.validation_step(data_batch, iteration)
+                if distributed.is_rank0():
+                    wandb.log({"val/loss": loss}, step=iteration)
                 self.callbacks.on_validation_step_end(model, data_batch, output_batch, loss, iteration=iteration)
         self.callbacks.on_validation_end(model, iteration=iteration)

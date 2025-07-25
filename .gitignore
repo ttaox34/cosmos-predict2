@@ -197,3 +197,8 @@ cython_debug/
 checkpoints/
 output/
 datasets/
+wandb/
+
+checkpoints
+output
+datasets

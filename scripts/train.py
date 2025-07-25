@@ -17,7 +17,11 @@ import argparse
 import importlib
 import os
 
+import attrs
+import torch
+import wandb
 from loguru import logger as logging
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from imaginaire.config import Config, pretty_print_overrides
 from imaginaire.lazy_config import instantiate
@@ -26,12 +30,67 @@ from imaginaire.utils import distributed
 from imaginaire.utils.config_helper import get_config_module, override
 
 
+def config_to_dict(cfg):
+    """
+    Recursively converts a config object (including attrs classes and OmegaConf configs)
+    into a dictionary that is serializable by wandb.
+    It handles non-serializable types like torch.dtype by converting them to strings.
+    This logic is adapted from imaginaire.lazy_config.lazy.LazyConfig.save_yaml
+    """
+
+    def is_serializable(item):
+        try:
+            # A quick check to see if OmegaConf can handle it.
+            # This is a proxy for YAML/JSON serializability.
+            OmegaConf.to_yaml(item)
+            return True
+        except Exception:
+            return False
+
+    def serialize_config(config):
+        if isinstance(config, DictConfig):
+            for key, value in config.items():
+                if isinstance(value, (DictConfig, ListConfig)):
+                    serialize_config(value)
+                else:
+                    if not is_serializable(value) and value is not None:
+                        config[key] = str(value)
+        elif isinstance(config, ListConfig):
+            for i, item in enumerate(config):
+                if isinstance(item, (DictConfig, ListConfig)):
+                    serialize_config(item)
+                else:
+                    if not is_serializable(item) and item is not None:
+                        config[i] = str(item)
+        return config
+
+    # 1. Convert the top-level attrs object to a dictionary.
+    config_as_dict = attrs.asdict(cfg)
+    # 2. Create an OmegaConf object, which can hold complex types.
+    config_omegaconf = DictConfig(content=config_as_dict, flags={"allow_objects": True})
+    # 3. Recursively serialize any non-standard objects to strings.
+    serialized_config_omegaconf = serialize_config(config_omegaconf)
+    # 4. Convert the sanitized OmegaConf object to a plain python dict.
+    final_dict = OmegaConf.to_container(serialized_config_omegaconf, resolve=True)
+    return final_dict
+
+
 @logging.catch(reraise=True)
 def launch(config: Config, args: argparse.Namespace) -> None:
     # Need to initialize the distributed environment before calling config.validate() because it tries to synchronize
     # a buffer across ranks. If you don't do this, then you end up allocating a bunch of buffers on rank 0, and also that
     # check doesn't actually do anything.
     distributed.init()
+
+    if distributed.is_rank0():
+        wandb.init(
+            entity='reasoner',
+            project=config.job.project,
+            group=config.job.group,
+            name=config.job.name,
+            config=config_to_dict(config),
+            mode="offline", 
+        )
 
     # Check that the config is valid
     config.validate()
