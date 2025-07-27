@@ -199,6 +199,7 @@ output/
 datasets/
 wandb/
 
+generated_captions
 checkpoints
 output
 datasets
